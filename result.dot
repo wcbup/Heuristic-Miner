@@ -1,0 +1,33 @@
+digraph SourceGra {
+x1 [shape = box label="inspection"];
+x2 [shape = box label="no concession"];
+x3 [shape = box label="record issue"];
+x4 [shape = box label="action not required"];
+x5 [shape = box label="work completion"];
+x6 [shape = box label="work mandate"];
+x7 [shape = box label="issue completion"];
+x8 [shape = box label="intervention authorization"];
+x9 [shape = circle label=" "];
+x10 [shape = circle label=" "];
+x11 [shape = circle label=" "];
+x12 [shape = circle label=" "];
+x13 [shape = circle label=" "];
+x14 [shape = circle label=" "];
+x15 [shape = circle label=" "];
+x1 -> x11;
+x2 -> x13;
+x3 -> x9;
+x4 -> x13;
+x5 -> x13;
+x6 -> x10;
+x7 -> x14;
+x8 -> x12;
+x9 -> x1;
+x10 -> x5;
+x11 -> x8;
+x11 -> x4;
+x12 -> x2;
+x12 -> x6;
+x13 -> x7;
+x15 -> x3;
+}
