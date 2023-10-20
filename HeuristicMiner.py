@@ -1,9 +1,10 @@
 from PetriNet import PetriNet
+import pm4py
 from pybeamline.sources import string_test_source, log_source
 from pybeamline.bevent import BEvent
 from reactivex import operators
 from math import ceil
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Set, List
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -95,10 +96,15 @@ class HeuristicMiner:
         self.counter = 1
         self.bucket_size = ceil(1.0 / self.error_epsilon)
 
+        self.task_set: Set[str] = set()
+        self.depend_matrix: Dict[str, Dict[str, float]] | None = None
+
     def get_new_event(self, event: BEvent) -> None:
         new_case_id: str = event.get_trace_name()
         new_task_name: str = event.get_event_name()
         bucket_id = ceil(self.counter * 1.0 / self.bucket_size)
+
+        self.task_set.add(new_task_name)
 
         # update counting set
         last_task_name = self.dc_set.update_case(new_case_id, new_task_name, bucket_id)
@@ -117,7 +123,7 @@ class HeuristicMiner:
             # self.print_set()
 
         self.counter += 1
-    
+
     def print_set(self) -> None:
         # print("---dc---")
         # for case_id in self.dc_set.counting_dict.keys():
@@ -134,12 +140,59 @@ class HeuristicMiner:
                 tmp_tuple = tmp_dict[succ_task]
                 print(f" {succ_task} f:{tmp_tuple[0]} {tmp_tuple[1]}")
                 print()
-    
+
+    def generate_petriNet(self) -> PetriNet:
+        def get_depend_frequency(pred_task: str, succ_task: str) -> int:
+            nonlocal self
+            dr_dict = self.dr_set.counting_dict
+            if pred_task not in dr_dict.keys():
+                return 0
+            elif succ_task not in dr_dict[pred_task].keys():
+                return 0
+            else:
+                return dr_dict[pred_task][succ_task][0]
+
+        self.depend_matrix = {}
+        # get dependency matrix
+        for pred_task in self.task_set:
+            self.depend_matrix[pred_task] = {}
+            for succ_task in self.task_set:
+                if pred_task != succ_task:
+                    pred2succ = get_depend_frequency(pred_task, succ_task)
+                    succ2pred = get_depend_frequency(succ_task, pred_task)
+                    self.depend_matrix[pred_task][succ_task] = (
+                        pred2succ - succ2pred
+                    ) / (pred2succ + succ2pred + 1)
+                else:
+                    tmp = get_depend_frequency(pred_task, succ_task)
+                    self.depend_matrix[pred_task][succ_task] = tmp / (tmp + 1)
+
+        for pred_task in self.task_set:
+            print(pred_task)
+            for succ_task in self.task_set:
+                print(f" {succ_task} {self.depend_matrix[pred_task][succ_task]}")
 
 
 # test code
 if __name__ == "__main__":
-    b_events = log_source("extension-log-4.xes")
+    # b_events = log_source("ExampleLog.xes")
+
+    traces_list = []
+
+    def add_traces(traces_list: List[str], new_trace: str, frequency: int) -> None:
+        for i in range(frequency):
+            traces_list.append(new_trace)
+
+    add_traces(traces_list, "AE", 5)
+    add_traces(traces_list, "ABCE", 10)
+    add_traces(traces_list, "ACBE", 10)
+    add_traces(traces_list, "ABE", 1)
+    add_traces(traces_list, "ACE", 1)
+    add_traces(traces_list, "ADE", 10)
+    add_traces(traces_list, "ADDE", 2)
+    add_traces(traces_list, "ADDDE", 1)
+    b_events = log_source(traces_list)
+
     # b_events = b_events.pipe(operators.take(5))
 
     miner = HeuristicMiner(0.0005, 0.8)
@@ -153,4 +206,5 @@ if __name__ == "__main__":
     #     print()
 
     miner.print_set()
-
+    # print(miner.counter)
+    miner.generate_petriNet()
