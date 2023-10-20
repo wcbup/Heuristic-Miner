@@ -59,3 +59,38 @@ no concession
  no concession 6
  inspection 1
  intervention authorization 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+record issue
+ inspection 1000
+
+inspection
+ action not required 517
+ intervention authorization 483
+
+action not required
+ issue completion 517
+
+intervention authorization
+ work mandate 247
+ no concession 236
+
+work mandate
+ work completion 247
+
+work completion
+ issue completion 247
+
+no concession
+ issue completion 236

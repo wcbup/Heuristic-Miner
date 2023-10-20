@@ -402,8 +402,8 @@ class Painter:
 # test code
 if __name__ == "__main__":
     # log = read_from_file("example-log.xes")
-    # log = read_from_file("extension-log-4.xes")
-    log = read_from_file("extension-log-noisy-4.xes")
+    log = read_from_file("extension-log-4.xes")
+    # log = read_from_file("extension-log-noisy-4.xes")
     # log_noisy = read_from_file("extension-log-noisy-4.xes")
     mined_model = alpha(log)
     # print(round(fitness_token_replay(log, mined_model), 5))
