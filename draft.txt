@@ -1,0 +1,61 @@
+record issue
+ inspection 917
+ issue completion 8
+ work completion 4
+ action not required 20
+ work mandate 4
+ intervention authorization 16
+ record issue 15
+ no concession 1
+
+inspection
+ action not required 480
+ intervention authorization 447
+ issue completion 26
+ inspection 22
+ work mandate 9
+ no concession 11
+ record issue 7
+ work completion 2
+
+action not required
+ issue completion 480
+ action not required 10
+ inspection 5
+ record issue 3
+
+intervention authorization
+ work mandate 228
+ no concession 217
+ issue completion 9
+ inspection 7
+ intervention authorization 7
+ work completion 9
+
+work mandate
+ work completion 223
+ issue completion 16
+ inspection 4
+ work mandate 5
+ record issue 1
+
+work completion
+ issue completion 219
+ work completion 9
+ inspection 4
+ work mandate 4
+ intervention authorization 2
+
+issue completion
+ issue completion 24
+ inspection 5
+ no concession 1
+ intervention authorization 3
+ action not required 5
+ work completion 2
+
+no concession
+ issue completion 222
+ no concession 6
+ inspection 1
+ intervention authorization 1

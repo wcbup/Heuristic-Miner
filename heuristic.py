@@ -150,6 +150,13 @@ def dependency_graph_file(
 def alpha(log: Dict[str, List[Dict[str, Union[int, str, datetime]]]]) -> PetriNet:
     dependency_graph = dependency_graph_file(log)
 
+    for pred in dependency_graph.keys():
+        print(pred)
+        for succ in dependency_graph[pred]:
+            print(f" {succ} {dependency_graph[pred][succ]}")
+        print()
+        
+
     task_set: Set[str] = set()
     for pred_task in dependency_graph.keys():
         if pred_task not in task_set:
@@ -394,11 +401,13 @@ class Painter:
 
 # test code
 if __name__ == "__main__":
-    log = read_from_file("extension-log-4.xes")
-    log_noisy = read_from_file("extension-log-noisy-4.xes")
+    # log = read_from_file("example-log.xes")
+    # log = read_from_file("extension-log-4.xes")
+    log = read_from_file("extension-log-noisy-4.xes")
+    # log_noisy = read_from_file("extension-log-noisy-4.xes")
     mined_model = alpha(log)
-    print(round(fitness_token_replay(log, mined_model), 5))
-    print(round(fitness_token_replay(log_noisy, mined_model), 5))
+    # print(round(fitness_token_replay(log, mined_model), 5))
+    # print(round(fitness_token_replay(log_noisy, mined_model), 5))
 
     painter = Painter()
     painter.generate_dot_code(mined_model)
