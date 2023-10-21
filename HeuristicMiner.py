@@ -86,6 +86,30 @@ class DrCountingSet:
             del self.counting_dict[pred_task][succ_task]
 
 
+class TaskNode:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.pred_task_list: List[str] = []
+        self.succ_task_list: List[str] = []
+
+    def parse_depend_matrix(
+        self, depend_matrix: Dict[str, Dict[str, float]], threshold: float
+    ) -> None:
+        for pred_task in depend_matrix.keys():
+            for succ_task in depend_matrix.keys():
+                if (
+                    pred_task == self.name
+                    and depend_matrix[pred_task][succ_task] >= threshold
+                ):
+                    self.succ_task_list.append(succ_task)
+
+                if (
+                    succ_task == self.name
+                    and depend_matrix[pred_task][succ_task] >= threshold
+                ):
+                    self.pred_task_list.append(pred_task)
+
+
 class HeuristicMiner:
     def __init__(self, error_epsilon: float, heuristic_threshold: float) -> None:
         self.error_epsilon = error_epsilon
@@ -96,7 +120,7 @@ class HeuristicMiner:
         self.counter = 1
         self.bucket_size = ceil(1.0 / self.error_epsilon)
 
-        self.task_set: Set[str] = set()
+        self.task_dict: Dict[str, TaskNode] = {}
         self.depend_matrix: Dict[str, Dict[str, float]] | None = None
 
     def get_new_event(self, event: BEvent) -> None:
@@ -104,7 +128,7 @@ class HeuristicMiner:
         new_task_name: str = event.get_event_name()
         bucket_id = ceil(self.counter * 1.0 / self.bucket_size)
 
-        self.task_set.add(new_task_name)
+        self.task_dict[new_task_name] = TaskNode(new_task_name)
 
         # update counting set
         last_task_name = self.dc_set.update_case(new_case_id, new_task_name, bucket_id)
@@ -154,9 +178,9 @@ class HeuristicMiner:
 
         self.depend_matrix = {}
         # get dependency matrix
-        for pred_task in self.task_set:
+        for pred_task in self.task_dict.keys():
             self.depend_matrix[pred_task] = {}
-            for succ_task in self.task_set:
+            for succ_task in self.task_dict.keys():
                 if pred_task != succ_task:
                     pred2succ = get_depend_frequency(pred_task, succ_task)
                     succ2pred = get_depend_frequency(succ_task, pred_task)
@@ -167,10 +191,10 @@ class HeuristicMiner:
                     tmp = get_depend_frequency(pred_task, succ_task)
                     self.depend_matrix[pred_task][succ_task] = tmp / (tmp + 1)
 
-        for pred_task in self.task_set:
-            print(pred_task)
-            for succ_task in self.task_set:
-                print(f" {succ_task} {self.depend_matrix[pred_task][succ_task]}")
+        # for pred_task in self.task_set:
+        #     print(pred_task)
+        #     for succ_task in self.task_set:
+        #         print(f" {succ_task} {self.depend_matrix[pred_task][succ_task]}")
 
 
 # test code
@@ -195,7 +219,7 @@ if __name__ == "__main__":
 
     # b_events = b_events.pipe(operators.take(5))
 
-    miner = HeuristicMiner(0.0005, 0.8)
+    miner = HeuristicMiner(0.00005, 0.8)
     b_events.subscribe(lambda x: miner.get_new_event(x))
 
     # for pred_task in miner.dr_set.counting_dict.keys():
