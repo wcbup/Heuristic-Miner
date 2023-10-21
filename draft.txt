@@ -94,3 +94,127 @@ work completion
 
 no concession
  issue completion 236
+
+
+
+
+
+
+Inbound Call
+ Inbound Call f:4920 0
+
+ Handle Case f:480 0
+
+ Email Outbound f:22 0
+
+ Call Outbound f:101 0
+
+ Handle Email f:3 0
+
+Handle Case
+ Handle Case f:982 0
+
+ Inbound Call f:188 0
+
+ Call Outbound f:135 0
+
+ Handle Email f:12 0
+
+ Email Outbound f:30 0
+
+ Inbound Email f:12 0
+
+Inbound Email
+ Inbound Email f:399 0
+
+ Handle Email f:102 0
+
+ Email Outbound f:275 0
+
+ Call Outbound f:97 0
+
+ Handle Case f:26 0
+
+ Inbound Call f:1 0
+
+Handle Email
+ Handle Email f:314 0
+
+ Email Outbound f:145 0
+
+ Call Outbound f:103 0
+
+ Inbound Email f:41 0
+
+ Handle Case f:28 0
+
+ Inbound Call f:16 0
+
+Email Outbound
+ Email Outbound f:448 0
+
+ Handle Case f:44 0
+
+ Handle Email f:202 0
+
+ Call Outbound f:39 0
+
+ Inbound Email f:35 0
+
+ Inbound Call f:17 0
+
+Call Outbound
+ Handle Case f:63 0
+
+ Email Outbound f:67 0
+
+ Handle Email f:40 0
+
+ Call Outbound f:713 0
+
+ Inbound Email f:38 0
+
+ Inbound Call f:57 0
+
+Inbound Email
+ Inbound Email 0.9975
+ Inbound Call 0.5
+ Handle Case 0.358974358974359
+ Handle Email 0.4236111111111111
+ Email Outbound 0.7717041800643086
+ Call Outbound 0.4338235294117647
+Inbound Call
+ Inbound Email -0.5
+ Inbound Call 0.9997967892704734
+ Handle Case 0.43647234678624813
+ Handle Email -0.65
+ Email Outbound 0.125
+ Call Outbound 0.27672955974842767
+Handle Case
+ Inbound Email -0.358974358974359
+ Inbound Call -0.43647234678624813
+ Handle Case 0.9989827060020345
+ Handle Email -0.3902439024390244
+ Email Outbound -0.18666666666666668
+ Call Outbound 0.36180904522613067
+Handle Email
+ Inbound Email -0.4236111111111111
+ Inbound Call 0.65
+ Handle Case 0.3902439024390244
+ Handle Email 0.9968253968253968
+ Email Outbound -0.16379310344827586
+ Call Outbound 0.4375
+Email Outbound
+ Inbound Email -0.7717041800643086
+ Inbound Call -0.125
+ Handle Case 0.18666666666666668
+ Handle Email 0.16379310344827586
+ Email Outbound 0.9977728285077951
+ Call Outbound -0.2616822429906542
+Call Outbound
+ Inbound Email -0.4338235294117647
+ Inbound Call -0.27672955974842767
+ Handle Case -0.36180904522613067
+ Handle Email -0.4375
+ Email Outbound 0.2616822429906542
+ Call Outbound 0.9985994397759104

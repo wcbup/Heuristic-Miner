@@ -1,4 +1,5 @@
 from PetriNet import *
+import os
 
 class Painter:
     def __init__(self) -> None:
@@ -14,7 +15,11 @@ class Painter:
         for id in petriNet.node_dic.keys():
             node = petriNet.node_dic[id]
             if isinstance(node, Place):
-                self.dot_code += f'x{id} [shape = circle label=" "];\n'
+                if node.token > 0:
+                    label = "start"
+                else:
+                    label = " "
+                self.dot_code += f'x{id} [shape = circle label="{label}"];\n'
             elif isinstance(node, Transition):
                 self.dot_code += f'x{id} [shape = box label="{node.name}"];\n'
             else:
@@ -30,3 +35,13 @@ class Painter:
         dot_file_path = "./result.dot"
         with open(dot_file_path, "w") as f:
             f.write(self.dot_code)
+    
+    def generate_graph_show(self, show_flag: bool) -> None:
+        DPI = 500
+        command = (
+            f".\\Graphviz\\bin\\dot.exe -Tpng -Gdpi={DPI} .\\result.dot -o result.png"
+        )
+        os.system(command)
+        if show_flag:
+            command = ".\\result.png"
+            os.system(command)

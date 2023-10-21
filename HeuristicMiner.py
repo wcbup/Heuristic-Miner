@@ -1,6 +1,7 @@
 from __future__ import annotations
 from PetriNet import PetriNet
 import pm4py
+from Painter import Painter
 from pybeamline.sources import string_test_source, log_source
 from pybeamline.bevent import BEvent
 from reactivex import operators
@@ -193,7 +194,7 @@ class XOR_Relation:
             pred_task_set = relation[0]
             succ_task_set = relation[1]
 
-            print(f"{[x.name for x in pred_task_set], [x.name for x in succ_task_set]}")
+            # print(f"{[x.name for x in pred_task_set], [x.name for x in succ_task_set]}")
 
             common_succ_set: Set[TaskNode] = set()
             for pred_task in pred_task_set:
@@ -248,6 +249,15 @@ class XOR_Relation:
                     break
 
 
+class IdGenerator:
+    def __init__(self) -> None:
+        self.index = 0
+
+    def get_new_index(self) -> int:
+        self.index += 1
+        return self.index
+
+
 class HeuristicMiner:
     def __init__(
         self, error_epsilon: float, depend_threshold: float, xor_threshold: float
@@ -288,6 +298,11 @@ class HeuristicMiner:
             # self.print_set()
 
         self.counter += 1
+        if self.counter % 300 == 0:
+            tmp_petriNet = self.generate_petriNet()
+            tmp_painter = Painter()
+            tmp_painter.generate_dot_code(tmp_petriNet)
+            tmp_painter.generate_graph_show(False)
 
     def print_set(self) -> None:
         # print("---dc---")
@@ -349,11 +364,11 @@ class HeuristicMiner:
                 self.depend_matrix, self.depend_threshold, self.task_dict
             )
 
-        self.print_tasks()
+        # self.print_tasks()
 
         xor_relations = XOR_Relation(self.task_dict)
-        xor_relations.print()
-        print()
+        # xor_relations.print()
+        # print()
         while xor_relations.extend_one_relation(
             self.xor_threshold, get_depend_frequency
         ):
@@ -365,18 +380,57 @@ class HeuristicMiner:
 
         xor_relations.remove_common_relation()
 
-        xor_relations.print()
+        # xor_relations.print()
 
         petriNet = PetriNet()
+        id_generator = IdGenerator()
         for task_name in self.task_dict.keys():
-            petriNet.add_transition(task_name)
+            petriNet.add_transition(task_name, id_generator.get_new_index())
 
+        for relation in xor_relations.relation_set_list:
+            pred_task_set = relation[0]
+            succ_task_set = relation[1]
 
+            tmp_place_id = id_generator.get_new_index()
+            petriNet.add_place(tmp_place_id)
+            for pred_task in pred_task_set:
+                petriNet.add_edge(
+                    petriNet.transition_name_to_id(pred_task.name), tmp_place_id
+                )
+            for succ_task in succ_task_set:
+                petriNet.add_edge(
+                    tmp_place_id, petriNet.transition_name_to_id(succ_task.name)
+                )
+
+        first_task_set: Set[TaskNode] = set()
+        last_task_set: Set[TaskNode] = set()
+        for task in self.task_dict.values():
+            if task.pred_task_set == set():
+                first_task_set.add(task)
+            if task.succ_task_set == set():
+                last_task_set.add(task)
+
+        # print(f"{[x.name for x in first_task_set]}")
+        # print(f"{[x.name for x in last_task_set]}")
+
+        for task in first_task_set:
+            tmp_place_id = id_generator.get_new_index()
+            petriNet.add_place(tmp_place_id)
+            petriNet.add_edge(tmp_place_id, petriNet.transition_name_to_id(task.name))
+            petriNet.add_marking(tmp_place_id)
+
+        for task in last_task_set:
+            tmp_place_id = id_generator.get_new_index()
+            petriNet.add_place(tmp_place_id)
+            petriNet.add_edge(petriNet.transition_name_to_id(task.name), tmp_place_id)
+
+        return petriNet
 
 
 # test code
 if __name__ == "__main__":
     # b_events = log_source("ExampleLog.xes")
+    b_events = log_source("extension-log-noisy-4.xes")
 
     traces_list = []
 
@@ -393,18 +447,18 @@ if __name__ == "__main__":
     # add_traces(traces_list, "ADDE", 2)
     # add_traces(traces_list, "ADDDE", 1)
 
-    add_traces(traces_list, "ABCD", 9)
-    add_traces(traces_list, "ACBD", 9)
-    add_traces(traces_list, "AED", 9)
-    add_traces(traces_list, "ABCED", 1)
-    add_traces(traces_list, "AECBD", 1)
-    add_traces(traces_list, "AD", 1)
+    # add_traces(traces_list, "ABCD", 9)
+    # add_traces(traces_list, "ACBD", 9)
+    # add_traces(traces_list, "AED", 9)
+    # add_traces(traces_list, "ABCED", 1)
+    # add_traces(traces_list, "AECBD", 1)
+    # add_traces(traces_list, "AD", 1)
 
-    b_events = log_source(traces_list)
+    # b_events = log_source(traces_list)
 
     # b_events = b_events.pipe(operators.take(5))
 
-    miner = HeuristicMiner(0.00005, 0.9, 0.9)
+    miner = HeuristicMiner(0.0000002, 0.96, 0.5)
     b_events.subscribe(lambda x: miner.get_new_event(x))
 
     # for pred_task in miner.dr_set.counting_dict.keys():
@@ -416,4 +470,7 @@ if __name__ == "__main__":
 
     miner.print_set()
     # print(miner.counter)
-    miner.generate_petriNet()
+    petriNet = miner.generate_petriNet()
+    painter = Painter()
+    painter.generate_dot_code(petriNet)
+    painter.generate_graph_show(False)
