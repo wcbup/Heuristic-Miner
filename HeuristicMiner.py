@@ -202,7 +202,7 @@ class XOR_Relation:
                     common_succ_set = copy(tmp_succ_set)
                 else:
                     common_succ_set = common_succ_set.intersection(tmp_succ_set)
-            
+
             common_succ_set -= succ_task_set
 
             for succ_task in common_succ_set:
@@ -217,7 +217,7 @@ class XOR_Relation:
                     common_pred_set = copy(tmp_pred_set)
                 else:
                     common_pred_set = common_pred_set.intersection(tmp_pred_set)
-            
+
             common_pred_set -= pred_task_set
 
             for pred_task in common_pred_set:
@@ -230,6 +230,22 @@ class XOR_Relation:
     def print(self) -> None:
         for relation in self.relation_set_list:
             print(f"{[x.name for x in relation[0]], [x.name for x in relation[1]]}")
+
+    def remove_common_relation(self) -> None:
+        flag = True
+        while flag:
+            flag = False
+            relation_len = len(self.relation_set_list)
+            for i in range(relation_len):
+                for j in range(relation_len):
+                    if i == j:
+                        continue
+                    if self.relation_set_list[i] == self.relation_set_list[j]:
+                        flag = True
+                        del self.relation_set_list[j]
+                        break
+                if flag == True:
+                    break
 
 
 class HeuristicMiner:
@@ -289,7 +305,7 @@ class HeuristicMiner:
                 tmp_tuple = tmp_dict[succ_task]
                 print(f" {succ_task} f:{tmp_tuple[0]} {tmp_tuple[1]}")
                 print()
-    
+
     def print_tasks(self) -> None:
         for task_name in self.task_dict.keys():
             print(task_name)
@@ -341,10 +357,21 @@ class HeuristicMiner:
         while xor_relations.extend_one_relation(
             self.xor_threshold, get_depend_frequency
         ):
-            xor_relations.print()
-            print()
-        
+            None
+            # xor_relations.print()
+            # print()
+
         self.print_tasks()
+
+        xor_relations.remove_common_relation()
+
+        xor_relations.print()
+
+        petriNet = PetriNet()
+        for task_name in self.task_dict.keys():
+            petriNet.add_transition(task_name)
+
+
 
 
 # test code
