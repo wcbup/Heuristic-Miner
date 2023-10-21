@@ -19,5 +19,6 @@ print(a_set == b_set)
 
 a = (set(), set())
 print(a)
-a[0].add(1)
+b = a[0]
+b.add(1)
 print(a)

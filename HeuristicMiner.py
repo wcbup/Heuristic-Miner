@@ -5,7 +5,8 @@ from pybeamline.sources import string_test_source, log_source
 from pybeamline.bevent import BEvent
 from reactivex import operators
 from math import ceil
-from typing import Dict, Tuple, Union, Set, List
+from typing import Dict, Tuple, Union, Set, List, Callable
+from copy import copy
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -120,15 +121,115 @@ class XOR_Relation:
         for pred_task in task_dict.values():
             for succ_task in pred_task.succ_task_set:
                 self.relation_set_list.append((set([pred_task]), set([succ_task])))
-    
-    # def extend_one_relation(self) -> bool:
-    #     """
-    #     extend one relation set
-    #     if success, return true
-    #     else return false
-    #     """
-    #     for relation in self.relation_set_list:
 
+    def extend_one_relation(
+        self, threshold: float, get_dep_fre: Callable[[str, str], int]
+    ) -> bool:
+        """
+        extend one relation set
+        if success, return true
+        else return false
+        """
+
+        def is_new_pred_valid(
+            pred_task_set: Set[TaskNode],
+            succ_task_set: Set[TaskNode],
+            new_pred_task: TaskNode,
+        ) -> bool:
+            nonlocal get_dep_fre
+            nonlocal threshold
+
+            def is_ab_c_xor(a: TaskNode, b: TaskNode, c: TaskNode) -> bool:
+                """
+                is a xor b -> c valid?
+                """
+                nonlocal get_dep_fre
+                nonlocal threshold
+                tmp = (get_dep_fre(a.name, b.name) + get_dep_fre(b.name, a.name)) / (
+                    get_dep_fre(a.name, c.name) + get_dep_fre(b.name, c.name) + 1
+                )
+                if tmp < threshold:
+                    return True
+                else:
+                    return False
+
+            for pred_task in pred_task_set:
+                for succ_task in succ_task_set:
+                    if not is_ab_c_xor(pred_task, new_pred_task, succ_task):
+                        return False
+
+            return True
+
+        def is_new_succ_valid(
+            pred_task_set: Set[TaskNode],
+            succ_task_set: Set[TaskNode],
+            new_succ_task: TaskNode,
+        ) -> bool:
+            nonlocal get_dep_fre
+            nonlocal threshold
+
+            def is_a_bc_xor(a: TaskNode, b: TaskNode, c: TaskNode) -> bool:
+                """
+                is a -> b xor b valid?
+                """
+                nonlocal get_dep_fre
+                nonlocal threshold
+                tmp = (get_dep_fre(b.name, c.name) + get_dep_fre(c.name, b.name)) / (
+                    get_dep_fre(a.name, b.name) + get_dep_fre(a.name, c.name) + 1
+                )
+                if tmp < threshold:
+                    return True
+                else:
+                    return False
+
+            for pred_task in pred_task_set:
+                for succ_task in succ_task_set:
+                    if not is_a_bc_xor(pred_task, succ_task, new_succ_task):
+                        return False
+
+            return True
+
+        for relation in self.relation_set_list:
+            pred_task_set = relation[0]
+            succ_task_set = relation[1]
+
+            print(f"{[x.name for x in pred_task_set], [x.name for x in succ_task_set]}")
+
+            common_succ_set: Set[TaskNode] = set()
+            for pred_task in pred_task_set:
+                tmp_succ_set = pred_task.succ_task_set
+                if common_succ_set == set():
+                    common_succ_set = copy(tmp_succ_set)
+                else:
+                    common_succ_set = common_succ_set.intersection(tmp_succ_set)
+            
+            common_succ_set -= succ_task_set
+
+            for succ_task in common_succ_set:
+                if is_new_succ_valid(pred_task_set, succ_task_set, succ_task):
+                    succ_task_set.add(succ_task)
+                    return True
+
+            common_pred_set: Set[TaskNode] = set()
+            for succ_task in succ_task_set:
+                tmp_pred_set = succ_task.pred_task_set
+                if common_pred_set == set():
+                    common_pred_set = copy(tmp_pred_set)
+                else:
+                    common_pred_set = common_pred_set.intersection(tmp_pred_set)
+            
+            common_pred_set -= pred_task_set
+
+            for pred_task in common_pred_set:
+                if is_new_pred_valid(pred_task_set, succ_task_set, pred_task):
+                    pred_task_set.add(pred_task)
+                    return True
+
+        return False
+
+    def print(self) -> None:
+        for relation in self.relation_set_list:
+            print(f"{[x.name for x in relation[0]], [x.name for x in relation[1]]}")
 
 
 class HeuristicMiner:
@@ -188,6 +289,13 @@ class HeuristicMiner:
                 tmp_tuple = tmp_dict[succ_task]
                 print(f" {succ_task} f:{tmp_tuple[0]} {tmp_tuple[1]}")
                 print()
+    
+    def print_tasks(self) -> None:
+        for task_name in self.task_dict.keys():
+            print(task_name)
+            print(f" pred: {[x.name for x in self.task_dict[task_name].pred_task_set]}")
+            print(f" succ: {[x.name for x in self.task_dict[task_name].succ_task_set]}")
+        print()
 
     def generate_petriNet(self) -> PetriNet:
         def get_depend_frequency(pred_task: str, succ_task: str) -> int:
@@ -225,19 +333,18 @@ class HeuristicMiner:
                 self.depend_matrix, self.depend_threshold, self.task_dict
             )
 
-        for task_name in self.task_dict.keys():
-            print(task_name)
-            print(
-                f" pred: {[x.name for x in self.task_dict[task_name].pred_task_set]}"
-            )
-            print(
-                f" succ: {[x.name for x in self.task_dict[task_name].succ_task_set]}"
-            )
+        self.print_tasks()
 
         xor_relations = XOR_Relation(self.task_dict)
-        # for xor_tuple in xor_relations.relation_set_list:
-        #     print(f"{[x.name for x in xor_tuple[0]], [x.name for x in xor_tuple[1]]}")
+        xor_relations.print()
+        print()
+        while xor_relations.extend_one_relation(
+            self.xor_threshold, get_depend_frequency
+        ):
+            xor_relations.print()
+            print()
         
+        self.print_tasks()
 
 
 # test code
