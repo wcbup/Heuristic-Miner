@@ -114,6 +114,14 @@ class TaskNode:
                     self.pred_task_list.append(task_dict[pred_task])
 
 
+class XOR_Relation:
+    def __init__(self, task_dict: Dict[str, TaskNode]) -> None:
+        self.relation_set_list: List[Tuple[Set[TaskNode], Set[TaskNode]]] = []
+        for pred_task in task_dict.values():
+            for succ_task in pred_task.succ_task_list:
+                self.relation_set_list.append((set([pred_task]), set([succ_task])))
+
+
 class HeuristicMiner:
     def __init__(
         self, error_epsilon: float, depend_threshold: float, xor_threshold: float
@@ -217,10 +225,9 @@ class HeuristicMiner:
                 f" succ: {[x.name for x in self.task_dict[task_name].succ_task_list]}"
             )
 
-        # xor_relation_list: List[Tuple[Set[TaskNode], Set[TaskNode]]] = []
-        # for pred_task in self.task_dict.values():
-        #     for succ_task in pred_task.succ_task_list:
-        #         xor_relation_list.append(set([]))
+        xor_relations = XOR_Relation(self.task_dict)
+        for xor_tuple in xor_relations.relation_set_list:
+            print(f"{[x.name for x in xor_tuple[0]], [x.name for x in xor_tuple[1]]}")
 
 
 # test code
