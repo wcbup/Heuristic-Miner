@@ -90,8 +90,8 @@ class DrCountingSet:
 class TaskNode:
     def __init__(self, name: str) -> None:
         self.name = name
-        self.pred_task_list: List[TaskNode] = []
-        self.succ_task_list: List[TaskNode] = []
+        self.pred_task_set: Set[TaskNode] = set()
+        self.succ_task_set: Set[TaskNode] = set()
 
     def parse_depend_matrix(
         self,
@@ -105,21 +105,30 @@ class TaskNode:
                     pred_task == self.name
                     and depend_matrix[pred_task][succ_task] >= threshold
                 ):
-                    self.succ_task_list.append(task_dict[succ_task])
+                    self.succ_task_set.add(task_dict[succ_task])
 
                 if (
                     succ_task == self.name
                     and depend_matrix[pred_task][succ_task] >= threshold
                 ):
-                    self.pred_task_list.append(task_dict[pred_task])
+                    self.pred_task_set.add(task_dict[pred_task])
 
 
 class XOR_Relation:
     def __init__(self, task_dict: Dict[str, TaskNode]) -> None:
         self.relation_set_list: List[Tuple[Set[TaskNode], Set[TaskNode]]] = []
         for pred_task in task_dict.values():
-            for succ_task in pred_task.succ_task_list:
+            for succ_task in pred_task.succ_task_set:
                 self.relation_set_list.append((set([pred_task]), set([succ_task])))
+    
+    # def extend_one_relation(self) -> bool:
+    #     """
+    #     extend one relation set
+    #     if success, return true
+    #     else return false
+    #     """
+    #     for relation in self.relation_set_list:
+
 
 
 class HeuristicMiner:
@@ -219,15 +228,16 @@ class HeuristicMiner:
         for task_name in self.task_dict.keys():
             print(task_name)
             print(
-                f" pred: {[x.name for x in self.task_dict[task_name].pred_task_list]}"
+                f" pred: {[x.name for x in self.task_dict[task_name].pred_task_set]}"
             )
             print(
-                f" succ: {[x.name for x in self.task_dict[task_name].succ_task_list]}"
+                f" succ: {[x.name for x in self.task_dict[task_name].succ_task_set]}"
             )
 
         xor_relations = XOR_Relation(self.task_dict)
-        for xor_tuple in xor_relations.relation_set_list:
-            print(f"{[x.name for x in xor_tuple[0]], [x.name for x in xor_tuple[1]]}")
+        # for xor_tuple in xor_relations.relation_set_list:
+        #     print(f"{[x.name for x in xor_tuple[0]], [x.name for x in xor_tuple[1]]}")
+        
 
 
 # test code
