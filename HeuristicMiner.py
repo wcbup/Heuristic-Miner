@@ -196,6 +196,16 @@ class HeuristicMiner:
         #     for succ_task in self.task_set:
         #         print(f" {succ_task} {self.depend_matrix[pred_task][succ_task]}")
 
+        for task_name in self.task_dict.keys():
+            self.task_dict[task_name].parse_depend_matrix(
+                self.depend_matrix, self.heuristic_threshold
+            )
+
+        for task_name in self.task_dict.keys():
+            print(task_name)
+            print(f" pred: {self.task_dict[task_name].pred_task_list}")
+            print(f" succ: {self.task_dict[task_name].succ_task_list}")
+
 
 # test code
 if __name__ == "__main__":
@@ -219,7 +229,7 @@ if __name__ == "__main__":
 
     # b_events = b_events.pipe(operators.take(5))
 
-    miner = HeuristicMiner(0.00005, 0.8)
+    miner = HeuristicMiner(0.00005, 0.9)
     b_events.subscribe(lambda x: miner.get_new_event(x))
 
     # for pred_task in miner.dr_set.counting_dict.keys():
