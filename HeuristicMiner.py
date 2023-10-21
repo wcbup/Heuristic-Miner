@@ -1,3 +1,4 @@
+from __future__ import annotations
 from PetriNet import PetriNet
 import pm4py
 from pybeamline.sources import string_test_source, log_source
@@ -89,11 +90,14 @@ class DrCountingSet:
 class TaskNode:
     def __init__(self, name: str) -> None:
         self.name = name
-        self.pred_task_list: List[str] = []
-        self.succ_task_list: List[str] = []
+        self.pred_task_list: List[TaskNode] = []
+        self.succ_task_list: List[TaskNode] = []
 
     def parse_depend_matrix(
-        self, depend_matrix: Dict[str, Dict[str, float]], threshold: float
+        self,
+        depend_matrix: Dict[str, Dict[str, float]],
+        threshold: float,
+        task_dict: Dict[str, TaskNode],
     ) -> None:
         for pred_task in depend_matrix.keys():
             for succ_task in depend_matrix.keys():
@@ -101,19 +105,22 @@ class TaskNode:
                     pred_task == self.name
                     and depend_matrix[pred_task][succ_task] >= threshold
                 ):
-                    self.succ_task_list.append(succ_task)
+                    self.succ_task_list.append(task_dict[succ_task])
 
                 if (
                     succ_task == self.name
                     and depend_matrix[pred_task][succ_task] >= threshold
                 ):
-                    self.pred_task_list.append(pred_task)
+                    self.pred_task_list.append(task_dict[pred_task])
 
 
 class HeuristicMiner:
-    def __init__(self, error_epsilon: float, heuristic_threshold: float) -> None:
+    def __init__(
+        self, error_epsilon: float, depend_threshold: float, xor_threshold: float
+    ) -> None:
         self.error_epsilon = error_epsilon
-        self.heuristic_threshold = heuristic_threshold
+        self.depend_threshold = depend_threshold
+        self.xor_threshold = xor_threshold
 
         self.dc_set = DcCountingSet()
         self.dr_set = DrCountingSet()
@@ -191,20 +198,29 @@ class HeuristicMiner:
                     tmp = get_depend_frequency(pred_task, succ_task)
                     self.depend_matrix[pred_task][succ_task] = tmp / (tmp + 1)
 
-        # for pred_task in self.task_set:
-        #     print(pred_task)
-        #     for succ_task in self.task_set:
-        #         print(f" {succ_task} {self.depend_matrix[pred_task][succ_task]}")
+        for pred_task in self.task_dict.keys():
+            print(pred_task)
+            for succ_task in self.task_dict.keys():
+                print(f" {succ_task} {self.depend_matrix[pred_task][succ_task]}")
 
         for task_name in self.task_dict.keys():
             self.task_dict[task_name].parse_depend_matrix(
-                self.depend_matrix, self.heuristic_threshold
+                self.depend_matrix, self.depend_threshold, self.task_dict
             )
 
         for task_name in self.task_dict.keys():
             print(task_name)
-            print(f" pred: {self.task_dict[task_name].pred_task_list}")
-            print(f" succ: {self.task_dict[task_name].succ_task_list}")
+            print(
+                f" pred: {[x.name for x in self.task_dict[task_name].pred_task_list]}"
+            )
+            print(
+                f" succ: {[x.name for x in self.task_dict[task_name].succ_task_list]}"
+            )
+
+        # xor_relation_list: List[Tuple[Set[TaskNode], Set[TaskNode]]] = []
+        # for pred_task in self.task_dict.values():
+        #     for succ_task in pred_task.succ_task_list:
+        #         xor_relation_list.append(set([]))
 
 
 # test code
@@ -217,19 +233,27 @@ if __name__ == "__main__":
         for i in range(frequency):
             traces_list.append(new_trace)
 
-    add_traces(traces_list, "AE", 5)
-    add_traces(traces_list, "ABCE", 10)
-    add_traces(traces_list, "ACBE", 10)
-    add_traces(traces_list, "ABE", 1)
-    add_traces(traces_list, "ACE", 1)
-    add_traces(traces_list, "ADE", 10)
-    add_traces(traces_list, "ADDE", 2)
-    add_traces(traces_list, "ADDDE", 1)
+    # add_traces(traces_list, "AE", 5)
+    # add_traces(traces_list, "ABCE", 10)
+    # add_traces(traces_list, "ACBE", 10)
+    # add_traces(traces_list, "ABE", 1)
+    # add_traces(traces_list, "ACE", 1)
+    # add_traces(traces_list, "ADE", 10)
+    # add_traces(traces_list, "ADDE", 2)
+    # add_traces(traces_list, "ADDDE", 1)
+
+    add_traces(traces_list, "ABCD", 9)
+    add_traces(traces_list, "ACBD", 9)
+    add_traces(traces_list, "AED", 9)
+    add_traces(traces_list, "ABCED", 1)
+    add_traces(traces_list, "AECBD", 1)
+    add_traces(traces_list, "AD", 1)
+
     b_events = log_source(traces_list)
 
     # b_events = b_events.pipe(operators.take(5))
 
-    miner = HeuristicMiner(0.00005, 0.9)
+    miner = HeuristicMiner(0.00005, 0.9, 0.9)
     b_events.subscribe(lambda x: miner.get_new_event(x))
 
     # for pred_task in miner.dr_set.counting_dict.keys():
