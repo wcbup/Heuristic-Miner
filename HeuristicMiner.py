@@ -101,6 +101,8 @@ class TaskNode:
         threshold: float,
         task_dict: Dict[str, TaskNode],
     ) -> None:
+        self.pred_task_set: Set[TaskNode] = set()
+        self.succ_task_set: Set[TaskNode] = set()
         for pred_task in depend_matrix.keys():
             for succ_task in depend_matrix.keys():
                 if (
@@ -279,7 +281,8 @@ class HeuristicMiner:
         new_task_name: str = event.get_event_name()
         bucket_id = ceil(self.counter * 1.0 / self.bucket_size)
 
-        self.task_dict[new_task_name] = TaskNode(new_task_name)
+        if new_task_name not in self.task_dict.keys():
+            self.task_dict[new_task_name] = TaskNode(new_task_name)
 
         # update counting set
         last_task_name = self.dc_set.update_case(new_case_id, new_task_name, bucket_id)
@@ -298,7 +301,7 @@ class HeuristicMiner:
             # self.print_set()
 
         self.counter += 1
-        if self.counter % 300 == 0:
+        if self.counter % 500 == 0:
             tmp_petriNet = self.generate_petriNet()
             tmp_painter = Painter()
             tmp_painter.generate_dot_code(tmp_petriNet)
@@ -430,7 +433,7 @@ class HeuristicMiner:
 # test code
 if __name__ == "__main__":
     # b_events = log_source("ExampleLog.xes")
-    b_events = log_source("extension-log-noisy-4.xes")
+    # b_events = log_source("extension-log-noisy-4.xes")
 
     traces_list = []
 
@@ -454,11 +457,15 @@ if __name__ == "__main__":
     # add_traces(traces_list, "AECBD", 1)
     # add_traces(traces_list, "AD", 1)
 
-    # b_events = log_source(traces_list)
+    add_traces(traces_list, "ABCD", 3000)
+    add_traces(traces_list, "ACBD", 2000)
+    add_traces(traces_list, "AED", 2000)
+
+    b_events = log_source(traces_list)
 
     # b_events = b_events.pipe(operators.take(5))
 
-    miner = HeuristicMiner(0.0000002, 0.96, 0.5)
+    miner = HeuristicMiner(0.000000002, 0.8, 0.5)
     b_events.subscribe(lambda x: miner.get_new_event(x))
 
     # for pred_task in miner.dr_set.counting_dict.keys():
