@@ -19,7 +19,7 @@ class Painter:
                     label = "start"
                 else:
                     label = " "
-                self.dot_code += f'x{id} [shape = circle label="{label}"];\n'
+                self.dot_code += f'x{id} [shape = circle label="{node.id}"];\n'
             elif isinstance(node, Transition):
                 self.dot_code += f'x{id} [shape = box label="{node.name}"];\n'
             else:

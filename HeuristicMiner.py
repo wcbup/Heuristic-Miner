@@ -301,7 +301,7 @@ class HeuristicMiner:
             # self.print_set()
 
         self.counter += 1
-        if self.counter % 500 == 0:
+        if self.counter % 5000 == 0:
             tmp_petriNet = self.generate_petriNet()
             tmp_painter = Painter()
             tmp_painter.generate_dot_code(tmp_petriNet)
@@ -416,16 +416,18 @@ class HeuristicMiner:
         # print(f"{[x.name for x in first_task_set]}")
         # print(f"{[x.name for x in last_task_set]}")
 
-        for task in first_task_set:
-            tmp_place_id = id_generator.get_new_index()
-            petriNet.add_place(tmp_place_id)
-            petriNet.add_edge(tmp_place_id, petriNet.transition_name_to_id(task.name))
-            petriNet.add_marking(tmp_place_id)
+        if first_task_set != set():
+            start_place_id = id_generator.get_new_index()
+            petriNet.add_place(start_place_id)
+            petriNet.add_marking(start_place_id)
+            for task in first_task_set:
+                petriNet.add_edge(start_place_id, petriNet.transition_name_to_id(task.name))
 
-        for task in last_task_set:
-            tmp_place_id = id_generator.get_new_index()
-            petriNet.add_place(tmp_place_id)
-            petriNet.add_edge(petriNet.transition_name_to_id(task.name), tmp_place_id)
+        if last_task_set != set():
+            end_place_id = id_generator.get_new_index()
+            petriNet.add_place(end_place_id)
+            for task in last_task_set:
+                petriNet.add_edge(petriNet.transition_name_to_id(task.name), end_place_id)
 
         return petriNet
 
@@ -433,7 +435,7 @@ class HeuristicMiner:
 # test code
 if __name__ == "__main__":
     # b_events = log_source("ExampleLog.xes")
-    # b_events = log_source("extension-log-noisy-4.xes")
+    b_events = log_source("extension-log-noisy-4.xes")
 
     traces_list = []
 
@@ -457,15 +459,18 @@ if __name__ == "__main__":
     # add_traces(traces_list, "AECBD", 1)
     # add_traces(traces_list, "AD", 1)
 
-    add_traces(traces_list, "ABCD", 3000)
-    add_traces(traces_list, "ACBD", 2000)
-    add_traces(traces_list, "AED", 2000)
+    # add_traces(traces_list, "ABCD", 3000)
+    # add_traces(traces_list, "ACBD", 2000)
+    # add_traces(traces_list, "AED", 2000)
 
-    b_events = log_source(traces_list)
+    # add_traces(traces_list, "ACD", 2000)
+    # add_traces(traces_list, "BCE", 2000)
+
+    # b_events = log_source(traces_list)
 
     # b_events = b_events.pipe(operators.take(5))
 
-    miner = HeuristicMiner(0.000000002, 0.8, 0.5)
+    miner = HeuristicMiner(0.000000002, 0.9605, 0.8)
     b_events.subscribe(lambda x: miner.get_new_event(x))
 
     # for pred_task in miner.dr_set.counting_dict.keys():
@@ -481,3 +486,5 @@ if __name__ == "__main__":
     painter = Painter()
     painter.generate_dot_code(petriNet)
     painter.generate_graph_show(False)
+    with open("./tmp.json", "w") as f:
+        f.write(petriNet.generate_json())

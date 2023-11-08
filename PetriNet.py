@@ -3,6 +3,7 @@ from typing import List, Set, Dict, Union, Tuple
 from datetime import datetime
 import xml.etree.ElementTree as ET
 from copy import copy, deepcopy
+import json
 
 
 class Place:
@@ -78,6 +79,29 @@ class PetriNet:
             new_p += 1
 
         return new_m, new_c, new_p
+
+    def generate_json(self) -> str:
+        info_dict: List[Dict[str, List[str | List[str]]]] = []
+
+        for node in self.node_dic.values():
+            node_dict = {}
+            if isinstance(node, Place):
+                node_dict["type"] = "place"
+                node_dict["name"] = str(node.id)
+                node_dict["successor"] = [
+                    self.node_dic[i].name for i in node.successor_id_set
+                ]
+
+            elif isinstance(node, Transition):
+                node_dict["type"] = "transition"
+                node_dict["name"] = node.name
+                node_dict["successor"] = [
+                    str(self.node_dic[i].id) for i in node.successor_id_set
+                ]
+            else:
+                raise Exception
+            info_dict.append(node_dict)
+        return json.dumps(info_dict)
 
 
 def read_from_file(
