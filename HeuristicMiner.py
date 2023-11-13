@@ -4,11 +4,15 @@ import pm4py
 from Painter import Painter
 from pybeamline.sources import string_test_source, log_source
 from pybeamline.bevent import BEvent
+from pybeamline.mappers import sliding_window_to_log
 from reactivex import operators
+from reactivex.operators import window_with_count
 from math import ceil
 from typing import Dict, Tuple, Union, Set, List, Callable
 from copy import copy
 import warnings
+import json
+import pandas as pd
 
 warnings.filterwarnings("ignore")
 
@@ -19,74 +23,6 @@ class DcTuple:
         self.task_name = task_name
         self.frequency = 1
         self.time_delta = time_delta
-
-
-class DcCountingSet:
-    def __init__(self) -> None:
-        self.counting_dict: Dict[str, DcTuple] = {}
-
-    def update_case(
-        self, case_id: str, task_name: str, bucket_id: int
-    ) -> Union[str, None]:
-        """
-        if case exists, add frequency automatically, return last task name
-        if case doesn't exist, add new tuple automatically, return None
-        """
-        if case_id in self.counting_dict.keys():
-            dc_tuple = self.counting_dict[case_id]
-            last_task_name = dc_tuple.task_name
-
-            dc_tuple.task_name = task_name
-            dc_tuple.frequency += 1
-
-            return last_task_name
-        else:
-            self.counting_dict[case_id] = DcTuple(case_id, task_name, bucket_id - 1)
-
-    def cleanup(self, bucket_id: int) -> None:
-        del_id_list = []
-        for case_id in self.counting_dict.keys():
-            dc_tuple = self.counting_dict[case_id]
-            if dc_tuple.frequency + dc_tuple.time_delta <= bucket_id:
-                del_id_list.append(case_id)
-
-        for id in del_id_list:
-            del self.counting_dict[id]
-
-
-class DrCountingSet:
-    def __init__(self) -> None:
-        # the first item in the tuple is frequency
-        # the second item in the tuple is delta
-        self.counting_dict: Dict[str, Dict[str, Tuple[int, int]]] = {}
-
-    def update(self, pred_task: str, succ_task: str, bucket_id: int) -> bool:
-        """
-        if relation exists, update the frequency automatically
-        if not, add new tuple automatically
-        """
-        if pred_task in self.counting_dict.keys():
-            tmp_dict = self.counting_dict[pred_task]
-            if succ_task not in tmp_dict:
-                tmp_dict[succ_task] = (1, bucket_id - 1)
-            else:
-                old_tuple = tmp_dict[succ_task]
-                tmp_dict[succ_task] = (old_tuple[0] + 1, old_tuple[1])
-        else:
-            self.counting_dict[pred_task] = {succ_task: (1, bucket_id - 1)}
-
-    def cleanup(self, bucket_id: int) -> None:
-        del_list = []
-
-        for pred_task in self.counting_dict.keys():
-            tmp_dict = self.counting_dict[pred_task]
-            for succ_task in tmp_dict.keys():
-                tmp_tuple = tmp_dict[succ_task]
-                if tmp_tuple[0] + tmp_tuple[1] <= bucket_id:
-                    del_list.append((pred_task, succ_task))
-
-        for pred_task, succ_task in del_list:
-            del self.counting_dict[pred_task][succ_task]
 
 
 class TaskNode:
@@ -262,50 +198,42 @@ class IdGenerator:
 
 class HeuristicMiner:
     def __init__(
-        self, error_epsilon: float, depend_threshold: float, xor_threshold: float
+        self, depend_threshold: float, xor_threshold: float, window_size: int
     ) -> None:
-        self.error_epsilon = error_epsilon
         self.depend_threshold = depend_threshold
         self.xor_threshold = xor_threshold
+        self.window_size = window_size
 
-        self.dc_set = DcCountingSet()
-        self.dr_set = DrCountingSet()
         self.counter = 1
-        self.bucket_size = ceil(1.0 / self.error_epsilon)
 
-        self.task_dict: Dict[str, TaskNode] = {}
         self.depend_matrix: Dict[str, Dict[str, float]] | None = None
 
-    def get_new_event(self, event: BEvent) -> None:
-        new_case_id: str = event.get_trace_name()
-        new_task_name: str = event.get_event_name()
-        bucket_id = ceil(self.counter * 1.0 / self.bucket_size)
+    def get_new_logs(self, logs: pd.DataFrame) -> None:
+        if len(logs) != self.window_size:
+            return
 
-        if new_task_name not in self.task_dict.keys():
-            self.task_dict[new_task_name] = TaskNode(new_task_name)
+        self.task_dict: Dict[str, TaskNode] = {}
+        for task_name in logs["concept:name"].drop_duplicates():
+            self.task_dict[task_name] = TaskNode(task_name)
 
-        # update counting set
-        last_task_name = self.dc_set.update_case(new_case_id, new_task_name, bucket_id)
-        if last_task_name != None:
-            self.dr_set.update(last_task_name, new_task_name, bucket_id)
+        dfg = pm4py.discover_dfg_typed(logs)
+        self.depend_dict: Dict[str, Dict[str, int]] = {}
+        for depend_relation in dfg.graph.keys():
+            pred_task = depend_relation[0]
+            succ_task = depend_relation[1]
+            if pred_task not in self.depend_dict.keys():
+                self.depend_dict[pred_task] = {succ_task: dfg.graph[depend_relation]}
+            else:
+                if succ_task not in self.depend_dict[pred_task].keys():
+                    self.depend_dict[pred_task][succ_task] = dfg.graph[depend_relation]
+                else:
+                    raise Exception
+        print(self.depend_dict)
 
-        # cleanup
-        if self.counter % self.bucket_size == 0:
-            # print("before cleanup")
-            # self.print_set()
-
-            self.dc_set.cleanup(bucket_id)
-            self.dr_set.cleanup(bucket_id)
-
-            # print("after cleanup")
-            # self.print_set()
-
-        self.counter += 1
-        if self.counter % 5000 == 0:
-            tmp_petriNet = self.generate_petriNet()
-            tmp_painter = Painter()
-            tmp_painter.generate_dot_code(tmp_petriNet)
-            tmp_painter.generate_graph_show(False)
+        tmp_petriNet = self.generate_petriNet()
+        tmp_painter = Painter()
+        tmp_painter.generate_dot_code(tmp_petriNet)
+        tmp_painter.generate_graph_show(False)
 
     def print_set(self) -> None:
         # print("---dc---")
@@ -334,13 +262,13 @@ class HeuristicMiner:
     def generate_petriNet(self) -> PetriNet:
         def get_depend_frequency(pred_task: str, succ_task: str) -> int:
             nonlocal self
-            dr_dict = self.dr_set.counting_dict
+            dr_dict = self.depend_dict
             if pred_task not in dr_dict.keys():
                 return 0
             elif succ_task not in dr_dict[pred_task].keys():
                 return 0
             else:
-                return dr_dict[pred_task][succ_task][0]
+                return dr_dict[pred_task][succ_task]
 
         self.depend_matrix = {}
         # get dependency matrix
@@ -421,15 +349,33 @@ class HeuristicMiner:
             petriNet.add_place(start_place_id)
             petriNet.add_marking(start_place_id)
             for task in first_task_set:
-                petriNet.add_edge(start_place_id, petriNet.transition_name_to_id(task.name))
+                petriNet.add_edge(
+                    start_place_id, petriNet.transition_name_to_id(task.name)
+                )
 
         if last_task_set != set():
             end_place_id = id_generator.get_new_index()
             petriNet.add_place(end_place_id)
             for task in last_task_set:
-                petriNet.add_edge(petriNet.transition_name_to_id(task.name), end_place_id)
+                petriNet.add_edge(
+                    petriNet.transition_name_to_id(task.name), end_place_id
+                )
 
         return petriNet
+
+
+def mine(logs: pd.DataFrame):
+    tasks = logs["concept:name"].drop_duplicates()
+
+    for task in tasks:
+        print(task)
+    # print(len(logs))
+    # print(logs.info())
+    # print(logs)
+    # dfg = pm4py.discover_dfg_typed(logs)
+    # print(dfg)
+    # for depend_relation in dfg.graph.keys():
+    #     print(depend_relation, dfg.graph[depend_relation])
 
 
 # test code
@@ -437,54 +383,65 @@ if __name__ == "__main__":
     # b_events = log_source("ExampleLog.xes")
     b_events = log_source("extension-log-noisy-4.xes")
 
-    traces_list = []
+    # b_events_windows = b_events.pipe(
+    #     operators.take(4500), window_with_count(4500, None), sliding_window_to_log()
+    # ).subscribe(mine)
 
-    def add_traces(traces_list: List[str], new_trace: str, frequency: int) -> None:
-        for i in range(frequency):
-            traces_list.append(new_trace)
+    miner = HeuristicMiner(0.9605, 0.8, 4200)
+    b_events_windows = b_events.pipe(
+        window_with_count(4200, 20), sliding_window_to_log()
+    ).subscribe(miner.get_new_logs)
 
-    # add_traces(traces_list, "AE", 5)
-    # add_traces(traces_list, "ABCE", 10)
-    # add_traces(traces_list, "ACBE", 10)
-    # add_traces(traces_list, "ABE", 1)
-    # add_traces(traces_list, "ACE", 1)
-    # add_traces(traces_list, "ADE", 10)
-    # add_traces(traces_list, "ADDE", 2)
-    # add_traces(traces_list, "ADDDE", 1)
+    # traces_list = []
 
-    # add_traces(traces_list, "ABCD", 9)
-    # add_traces(traces_list, "ACBD", 9)
-    # add_traces(traces_list, "AED", 9)
-    # add_traces(traces_list, "ABCED", 1)
-    # add_traces(traces_list, "AECBD", 1)
-    # add_traces(traces_list, "AD", 1)
+    # def add_traces(traces_list: List[str], new_trace: str, frequency: int) -> None:
+    #     for i in range(frequency):
+    #         traces_list.append(new_trace)
 
-    # add_traces(traces_list, "ABCD", 3000)
-    # add_traces(traces_list, "ACBD", 2000)
-    # add_traces(traces_list, "AED", 2000)
+    # # add_traces(traces_list, "AE", 5)
+    # # add_traces(traces_list, "ABCE", 10)
+    # # add_traces(traces_list, "ACBE", 10)
+    # # add_traces(traces_list, "ABE", 1)
+    # # add_traces(traces_list, "ACE", 1)
+    # # add_traces(traces_list, "ADE", 10)
+    # # add_traces(traces_list, "ADDE", 2)
+    # # add_traces(traces_list, "ADDDE", 1)
 
-    # add_traces(traces_list, "ACD", 2000)
-    # add_traces(traces_list, "BCE", 2000)
+    # # add_traces(traces_list, "ABCD", 9)
+    # # add_traces(traces_list, "ACBD", 9)
+    # # add_traces(traces_list, "AED", 9)
+    # # add_traces(traces_list, "ABCED", 1)
+    # # add_traces(traces_list, "AECBD", 1)
+    # # add_traces(traces_list, "AD", 1)
 
-    # b_events = log_source(traces_list)
+    # # add_traces(traces_list, "ABCD", 3000)
+    # # add_traces(traces_list, "ACBD", 2000)
+    # # add_traces(traces_list, "AED", 2000)
 
-    # b_events = b_events.pipe(operators.take(5))
+    # # add_traces(traces_list, "ACD", 2000)
+    # # add_traces(traces_list, "BCE", 2000)
 
-    miner = HeuristicMiner(0.000000002, 0.9605, 0.8)
-    b_events.subscribe(lambda x: miner.get_new_event(x))
+    # # b_events = log_source(traces_list)
 
-    # for pred_task in miner.dr_set.counting_dict.keys():
-    #     tmp_dict = miner.dr_set.counting_dict[pred_task]
-    #     print(pred_task)
-    #     for succ_task in tmp_dict:
-    #         print(f" {succ_task} {tmp_dict[succ_task]}")
-    #     print()
+    # # b_events = b_events.pipe(operators.take(5))
 
-    miner.print_set()
-    # print(miner.counter)
-    petriNet = miner.generate_petriNet()
-    painter = Painter()
-    painter.generate_dot_code(petriNet)
-    painter.generate_graph_show(False)
-    with open("./tmp.json", "w") as f:
-        f.write(petriNet.generate_json())
+    # miner = HeuristicMiner(0.000000002, 0.9605, 0.8)
+    # b_events.subscribe(lambda x: miner.get_new_event(x))
+
+    # # for pred_task in miner.dr_set.counting_dict.keys():
+    # #     tmp_dict = miner.dr_set.counting_dict[pred_task]
+    # #     print(pred_task)
+    # #     for succ_task in tmp_dict:
+    # #         print(f" {succ_task} {tmp_dict[succ_task]}")
+    # #     print()
+
+    # miner.print_set()
+    # # print(miner.counter)
+    # petriNet = miner.generate_petriNet()
+    # painter = Painter()
+    # painter.generate_dot_code(petriNet)
+    # painter.generate_graph_show(False)
+    # with open("./tmp.json", "w") as f:
+    #     f.write(petriNet.generate_json())
+    # with open("./dot.json", "w") as f:
+    #     f.write(json.dumps({"dot code":painter.dot_code}))
